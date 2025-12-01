@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Smart Diff (Key Alignment)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f0f2f5; margin: 0; }
+        h2 { text-align: center; color: #333; margin-bottom: 10px; }
+
+        /* 컨트롤 영역 */
+        .controls { 
+            text-align: center; margin-bottom: 20px; padding: 15px; 
+            background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        }
+        .controls label { margin-right: 15px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; }
+        .controls input[type="checkbox"] { margin-right: 5px; transform: scale(1.2); vertical-align: middle; }
+        
+        .btn { 
+            padding: 8px 20px; color: white; border: none; 
+            border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;
+            transition: background 0.2s;
+        }
+        .btn-primary { background-color: #0069d9; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #545b62; }
+
+        .input-container { display: flex; gap: 10px; height: 25vh; margin-bottom: 20px; }
+        .input-box { flex: 1; display: flex; flex-direction: column; }
+        .input-box h3 { margin: 0 0 5px 0; font-size: 14px; color: #555; }
+        textarea { 
+            flex: 1; padding: 10px; font-family: monospace; border: 1px solid #ccc; 
+            border-radius: 4px; resize: none; font-size: 12px;
+        }
+
+        #result-container { 
+            display: none; width: 100%; border: 1px solid #ddd; background: white; 
+            font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5;
+        }
+
+        .diff-row { display: flex; border-bottom: 1px solid #f0f0f0; }
+        
+        .cell { flex: 1; padding: 2px 5px; white-space: pre-wrap; word-break: break-all; position: relative; }
+        .cell-left { border-right: 1px solid #ddd; }
+
+        .bg-white { background-color: #fff; color: #333; }
+        .bg-diff { background-color: #ffeef0; color: #d10000; font-weight: bold; }
+        
+        /* 빈 공간 빗금 처리 */
+        .bg-empty {
+            background: repeating-linear-gradient(45deg, #fcfcfc, #fcfcfc 10px, #f0f0f0 10px, #f0f0f0 20px);
+            color: transparent; user-select: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>JSON Smart Diff (Key Alignment)</h2>
+
+    <div class="controls">
+        <label><input type="checkbox" id="chk-remove-null"> Null 값 삭제</label>
+        <label><input type="checkbox" id="chk-sort-keys" checked> 키 정렬 (필수)</label>
+        <label style="color: #d10000;"><input type="checkbox" id="chk-diff-only"> <strong>다른 부분만 보기</strong></label>
+        
+        <span style="display:inline-block; width: 20px;"></span>
+        
+        <button class="btn btn-secondary" onclick="swapInputs()">↔ 좌우 전환</button>
+        <button class="btn btn-primary" onclick="compareJson()">비교 실행</button>
+    </div>
+
+    <div class="input-container">
+        <div class="input-box">
+            <h3>Left (Original)</h3>
+            <textarea id="json-input-left" placeholder='{"left": "206"}'></textarea>
+        </div>
+        <div class="input-box">
+            <h3>Right (Changed)</h3>
+            <textarea id="json-input-right" placeholder='{"isModifyMode": true}'></textarea>
+        </div>
+    </div>
+
+    <div id="result-container"></div>
+
+    <script>
+        function swapInputs() {
+            const leftEl = document.getElementById('json-input-left');
+            const rightEl = document.getElementById('json-input-right');
+            const temp = leftEl.value;
+            leftEl.value = rightEl.value;
+            rightEl.value = temp;
+            if (leftEl.value.trim() !== "" || rightEl.value.trim() !== "") compareJson();
+        }
+
+        function removeNulls(obj) {
+            if (Array.isArray(obj)) return obj.map(v => removeNulls(v)).filter(v => v !== null);
+            if (typeof obj === 'object' && obj !== null) {
+                return Object.keys(obj).reduce((acc, key) => {
+                    const val = removeNulls(obj[key]);
+                    if (val !== null) acc[key] = val;
+                    return acc;
+                }, {});
+            }
+            return obj;
+        }
+
+        function sortObject(obj) {
+            if (Array.isArray(obj)) return obj.map(sortObject);
+            if (typeof obj === 'object' && obj !== null) {
+                return Object.keys(obj).sort().reduce((acc, key) => {
+                    acc[key] = sortObject(obj[key]);
+                    return acc;
+                }, {});
+            }
+            return obj;
+        }
+
+        function getIndentLevel(str) {
+            const match = str.match(/^(\s*)/);
+            return match ? match[0].length : 0;
+        }
+
+        // --- [핵심] 문자열에서 JSON Key 추출 ---
+        function extractKey(str) {
+            // "keyName": value 형태에서 keyName 추출
+            const match = str.match(/^\s*"([^"]+)"\s*:/);
+            return match ? match[1] : null;
+        }
+
+        function compareJson() {
+            const leftRaw = document.getElementById('json-input-left').value;
+            const rightRaw = document.getElementById('json-input-right').value;
+            const removeNullOption = document.getElementById('chk-remove-null').checked;
+            const sortKeyOption = document.getElementById('chk-sort-keys').checked;
+            const diffOnlyOption = document.getElementById('chk-diff-only').checked;
+            const resultContainer = document.getElementById('result-container');
+
+            let leftObj, rightObj;
+            try {
+                leftObj = JSON.parse(leftRaw || "{}");
+                rightObj = JSON.parse(rightRaw || "{}");
+            } catch (e) {
+                alert("JSON 파싱 오류: " + e.message);
+                return;
+            }
+
+            if (removeNullOption) {
+                leftObj = removeNulls(leftObj);
+                rightObj = removeNulls(rightObj);
+            }
+            if (sortKeyOption) {
+                leftObj = sortObject(leftObj);
+                rightObj = sortObject(rightObj);
+            }
+
+            const leftStr = JSON.stringify(leftObj, null, 4);
+            const rightStr = JSON.stringify(rightObj, null, 4);
+
+            const diff = Diff.diffLines(leftStr, rightStr);
+            
+            let allRows = [];
+            let leftBuffer = [], rightBuffer = [];
+
+            // --- [핵심] 스마트 정렬 로직 (Buffer Flush) ---
+            function flushToRows() {
+                // 1. 버퍼에 쌓인 줄들을 Key 기준으로 재정렬/매칭 (Merge Sort 유사 로직)
+                let lIndex = 0;
+                let rIndex = 0;
+
+                while (lIndex < leftBuffer.length || rIndex < rightBuffer.length) {
+                    const lItem = leftBuffer[lIndex];
+                    const rItem = rightBuffer[rIndex];
+                    
+                    const lKey = lItem ? extractKey(lItem.text) : null;
+                    const rKey = rItem ? extractKey(rItem.text) : null;
+
+                    let pushLeft = false;
+                    let pushRight = false;
+
+                    // 비교 로직
+                    if (lItem && rItem) {
+                        if (lKey && rKey) {
+                            if (lKey === rKey) {
+                                // 키가 같으면 같은 줄에 표시 (값 변경)
+                                pushLeft = true;
+                                pushRight = true;
+                            } else if (lKey < rKey) {
+                                // 왼쪽 키가 사전순으로 앞서면 -> 왼쪽 출력, 오른쪽 공백 (왼쪽에만 있음)
+                                pushLeft = true;
+                            } else {
+                                // 오른쪽 키가 사전순으로 앞서면 -> 왼쪽 공백, 오른쪽 출력 (오른쪽에만 있음)
+                                pushRight = true;
+                            }
+                        } else {
+                            // 키를 찾을 수 없는 경우 (배열 값이나 괄호 등) -> 그냥 순서대로 출력
+                            pushLeft = true;
+                            pushRight = true;
+                        }
+                    } else if (lItem) {
+                        pushLeft = true;
+                    } else if (rItem) {
+                        pushRight = true;
+                    }
+
+                    // 데이터 생성
+                    const lData = pushLeft ? lItem : { text: "", type: "bg-empty" };
+                    const rData = pushRight ? rItem : { text: "", type: "bg-empty" };
+                    
+                    const mainText = (lData.type !== "bg-empty") ? lData.text : rData.text;
+                    const indent = getIndentLevel(mainText);
+
+                    allRows.push({
+                        left: lData,
+                        right: rData,
+                        indent: indent,
+                        isDiff: (lData.type === 'bg-diff' || rData.type === 'bg-diff'),
+                        textForContext: mainText
+                    });
+
+                    if (pushLeft) lIndex++;
+                    if (pushRight) rIndex++;
+                }
+
+                leftBuffer = [];
+                rightBuffer = [];
+            }
+
+            diff.forEach((part) => {
+                const lines = part.value.split('\n');
+                if (lines[lines.length - 1] === '') lines.pop();
+
+                if (part.added) {
+                    lines.forEach(l => rightBuffer.push({ text: l, type: 'bg-diff' }));
+                } else if (part.removed) {
+                    lines.forEach(l => leftBuffer.push({ text: l, type: 'bg-diff' }));
+                } else {
+                    flushToRows(); // 변경된 내용들 먼저 스마트 정렬해서 출력
+                    
+                    // 공통 부분은 바로 출력 (버퍼 안 거침)
+                    lines.forEach(l => {
+                        const indent = getIndentLevel(l);
+                        allRows.push({
+                            left: { text: l, type: 'bg-white' },
+                            right: { text: l, type: 'bg-white' },
+                            indent: indent,
+                            isDiff: false,
+                            textForContext: l
+                        });
+                    });
+                }
+            });
+            flushToRows(); // 남은 버퍼 처리
+
+            // --- 필터링 및 렌더링 ---
+            let visibleIndices = new Set();
+            if (!diffOnlyOption) {
+                allRows.forEach((_, idx) => visibleIndices.add(idx));
+            } else {
+                allRows.forEach((row, idx) => {
+                    if (row.isDiff) visibleIndices.add(idx);
+                });
+                let sortedIndices = [...visibleIndices].sort((a, b) => a - b);
+                sortedIndices.forEach(index => {
+                    let currentIndent = allRows[index].indent;
+                    for (let i = index - 1; i >= 0; i--) {
+                        const row = allRows[i];
+                        if (row.indent < currentIndent) {
+                            visibleIndices.add(i);
+                            currentIndent = row.indent;
+                        }
+                        if (currentIndent === 0) break;
+                    }
+                });
+                [...visibleIndices].forEach(index => {
+                    const row = allRows[index];
+                    if (row.textForContext.includes('{') || row.textForContext.includes('[')) {
+                        for (let i = index + 1; i < allRows.length; i++) {
+                            const nextRow = allRows[i];
+                            if (nextRow.indent < row.indent) break; 
+                            if (nextRow.indent === row.indent) {
+                                const t = nextRow.textForContext.trim();
+                                if (t.startsWith('}') || t.startsWith(']')) {
+                                    visibleIndices.add(i);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            resultContainer.innerHTML = '';
+            resultContainer.style.display = 'block';
+
+            const sortedVisible = [...visibleIndices].sort((a, b) => a - b);
+            if (sortedVisible.length === 0) {
+                resultContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#555;">차이점이 없거나 데이터가 비어있습니다.</div>';
+                return;
+            }
+
+            sortedVisible.forEach(index => {
+                const rowData = allRows[index];
+                const rowEl = document.createElement('div');
+                rowEl.className = 'diff-row';
+
+                const leftCell = document.createElement('div');
+                leftCell.className = `cell cell-left ${rowData.left.type}`;
+                leftCell.textContent = rowData.left.text;
+                
+                const rightCell = document.createElement('div');
+                rightCell.className = `cell cell-right ${rowData.right.type}`;
+                rightCell.textContent = rowData.right.text;
+
+                rowEl.appendChild(leftCell);
+                rowEl.appendChild(rightCell);
+                resultContainer.appendChild(rowEl);
+            });
+        }
+    </script>
+</body>
+</html>
