@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON Smart Diff (Gradient Overlay Delete)</title>
+    <title>JSON Smart Diff (Align & Un-align)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
     <style>
-        /* 기본 리셋 */
+        /* --- 기본 스타일 (유지) --- */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; height: 100vh; overflow: hidden; }
         
-        /* --- 사이드바 --- */
         .sidebar {
             position: fixed; top: 0; left: -320px; width: 300px; height: 100vh;
             background-color: #ffffff; border-right: 1px solid #ddd;
@@ -18,7 +17,6 @@
             transition: left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         .sidebar.open { left: 0; }
-
         .history-toggle-btn {
             position: absolute; top: 20px; left: 20px; z-index: 500;
             background-color: #343a40; color: white; border: none; padding: 10px 15px;
@@ -27,162 +25,70 @@
             transition: transform 0.2s, background 0.2s; display: flex; align-items: center; gap: 5px;
         }
         .history-toggle-btn:hover { background-color: #23272b; transform: scale(1.05); }
-
-        .sidebar-header {
-            padding: 20px; border-bottom: 1px solid #eee; background-color: #f8f9fa;
-            display: flex; justify-content: space-between; align-items: center;
-        }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #eee; background-color: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h3 { margin: 0; font-size: 18px; color: #333; }
         .btn-close-sidebar { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; }
-        .btn-close-sidebar:hover { color: #333; }
-
-        .btn-clear {
-            margin-top: 10px; width: 100%; padding: 8px; font-size: 12px;
-            background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;
-        }
-
+        .btn-clear { margin-top: 10px; width: 100%; padding: 8px; font-size: 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .history-list { flex: 1; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
-        
-        /* [수정] 히스토리 아이템 스타일 */
-        .history-item {
-            position: relative; 
-            padding: 15px; 
-            border-bottom: 1px solid #f0f0f0; 
-            cursor: pointer; 
-            transition: background 0.2s;
-            overflow: hidden; /* 오버레이가 튀어나가지 않게 */
-        }
+        .history-item { position: relative; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; overflow: hidden; }
         .history-item:hover { background-color: #f8f9fa; }
         .history-item.active { background-color: #e7f1ff; border-left: 4px solid #0069d9; }
-        
-        /* [핵심] 그라데이션 오버레이 & 삭제 버튼 컨테이너 */
-        .delete-overlay {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            width: 80px; /* 그라데이션 너비 */
-            /* 왼쪽(투명) -> 오른쪽(흰색/배경색) 그라데이션 */
-            background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,1) 40%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0; /* 기본 숨김 */
-            transition: opacity 0.2s ease-in-out;
-            padding-left: 20px; /* 그라데이션 시작점 확보 */
-        }
-
-        /* Active 상태일 때의 오버레이 색상 조정 (배경색인 #e7f1ff와 맞춤) */
-        .history-item.active .delete-overlay {
-            background: linear-gradient(to right, rgba(231, 241, 255, 0), rgba(231, 241, 255, 1) 40%);
-        }
-        /* Hover 상태일 때의 오버레이 색상 조정 (배경색인 #f8f9fa와 맞춤) */
-        .history-item:hover:not(.active) .delete-overlay {
-            background: linear-gradient(to right, rgba(248, 249, 250, 0), rgba(248, 249, 250, 1) 40%);
-        }
-
-        /* Hover 시 오버레이 보이기 */
-        .history-item:hover .delete-overlay {
-            opacity: 1;
-        }
-
-        /* 둥근 X 버튼 스타일 */
-        .btn-delete-circle {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background-color: #ff4d4d;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            transition: transform 0.1s, background 0.2s;
-            margin-right: 10px; /* 우측 여백 */
-        }
-        .btn-delete-circle:hover {
-            background-color: #d32f2f;
-            transform: scale(1.1);
-        }
-
+        .delete-overlay { position: absolute; top: 0; right: 0; bottom: 0; width: 80px; background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,1) 40%); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease-in-out; padding-left: 20px; }
+        .history-item:hover .delete-overlay { opacity: 1; }
+        .btn-delete-circle { width: 28px; height: 28px; border-radius: 50%; background-color: #ff4d4d; color: white; border: none; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: transform 0.1s, background 0.2s; margin-right: 10px; }
         .history-date { font-size: 11px; color: #888; margin-bottom: 4px; }
         .history-title { font-size: 13px; font-weight: 600; color: #333; line-height: 1.4; word-break: break-all; }
 
-        /* --- 메인 컨텐츠 영역 --- */
-        .main-content {
-            height: 100vh; padding: 20px; box-sizing: border-box; overflow-y: auto;
-            display: flex; flex-direction: column;
-        }
+        /* 메인 컨텐츠 */
+        .main-content { height: 100vh; padding: 20px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; }
         h2 { text-align: center; color: #333; margin-top: 10px; margin-bottom: 20px; }
-        
-        .controls { 
-            text-align: center; margin-bottom: 20px; padding: 15px; 
-            background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
-        }
+        .controls { text-align: center; margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .controls label { margin-right: 15px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; }
         .controls input[type="checkbox"] { margin-right: 5px; transform: scale(1.2); vertical-align: middle; }
-        
-        .btn { 
-            padding: 8px 20px; color: white; border: none; 
-            border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;
-            transition: background 0.2s;
-        }
+        .btn { padding: 8px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px; transition: background 0.2s; }
         .btn-primary { background-color: #0069d9; }
-        .btn-primary:hover { background-color: #0056b3; }
         .btn-secondary { background-color: #6c757d; }
-        .btn-secondary:hover { background-color: #545b62; }
-
-        .description-container { margin-bottom: 10px; }
-        .desc-input {
-            width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc;
-            border-radius: 4px; font-size: 14px; font-family: 'Segoe UI', sans-serif; background-color: #fff;
-        }
-        .desc-input:focus { outline: none; border-color: #0069d9; box-shadow: 0 0 0 2px rgba(0,105,217, 0.2); }
-
+        .btn-outline { background-color: white; border: 1px solid #ccc; color: #333; }
+        .btn-outline:hover { background-color: #f8f9fa; }
+        .btn-warning { background-color: #ffc107; color: #333; }
+        .btn-warning:hover { background-color: #e0a800; }
+        .desc-input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 10px; }
         .input-container { display: flex; gap: 10px; min-height: 200px; margin-bottom: 20px; }
         .input-box { flex: 1; display: flex; flex-direction: column; }
         .input-box h3 { margin: 0 0 5px 0; font-size: 14px; color: #555; }
-        textarea { 
-            flex: 1; padding: 10px; font-family: monospace; border: 1px solid #ccc; 
-            border-radius: 4px; resize: vertical; font-size: 12px; min-height: 150px;
-        }
-
-        #result-container { 
-            display: none; width: 100%; border: 1px solid #ddd; background: white; 
-            font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5;
-            margin-bottom: 50px;
-        }
+        textarea { flex: 1; padding: 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 4px; resize: vertical; font-size: 12px; min-height: 150px; }
+        #result-container { display: none; width: 100%; border: 1px solid #ddd; background: white; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5; margin-bottom: 50px; }
 
         .diff-row { display: flex; border-bottom: 1px solid #f0f0f0; }
-        .cell { flex: 1; padding: 2px 5px; white-space: pre-wrap; word-break: break-all; position: relative; }
+        .cell { flex: 1; padding: 2px 5px; white-space: pre-wrap; word-break: break-all; position: relative; cursor: pointer; }
+        .cell:hover { background-color: #f1f3f5; }
         .cell-left { border-right: 1px solid #ddd; }
         .bg-white { background-color: #fff; color: #333; }
         .bg-diff { background-color: #ffeef0; color: #d10000; font-weight: bold; }
-        .bg-empty {
-            background: repeating-linear-gradient(45deg, #fcfcfc, #fcfcfc 10px, #f0f0f0 10px, #f0f0f0 20px);
-            color: transparent; user-select: none;
+        .bg-empty { background: repeating-linear-gradient(45deg, #fcfcfc, #fcfcfc 10px, #f0f0f0 10px, #f0f0f0 20px); color: transparent; user-select: none; cursor: default; }
+        .cell.selected { background-color: #fff3cd !important; outline: 2px solid #ffc107; z-index: 10; }
+        
+        /* 강제 정렬된 줄 스타일 */
+        .diff-row.forced-aligned { background-color: #e8f5e9; border-top: 1px solid #4caf50; border-bottom: 1px solid #4caf50; }
+        .diff-row.forced-aligned .cell { font-weight: bold; color: #2e7d32; }
+        /* 마우스 올렸을 때 해제 가능함을 표시 */
+        .diff-row.forced-aligned .cell:hover { background-color: #ffcdd2; color: #d32f2f; }
+        .diff-row.forced-aligned .cell:hover::after {
+            content: " (클릭하여 해제)"; font-size: 10px; opacity: 0.7;
         }
+        
+        .align-info { text-align: center; font-size: 13px; color: #0069d9; margin-bottom: 10px; font-weight: bold; }
+        .shortcut-tip { font-size: 11px; color: #666; font-weight: normal; margin-left: 10px; }
     </style>
 </head>
 <body>
 
-    <button class="history-toggle-btn" id="btn-toggle-history" onclick="toggleSidebar(event)">
-        <span>🕒 히스토리</span>
-    </button>
+    <button class="history-toggle-btn" onclick="toggleSidebar(event)"><span>🕒 히스토리</span></button>
 
     <aside class="sidebar" id="history-sidebar" onclick="event.stopPropagation()">
-        <div class="sidebar-header">
-            <h3>History List</h3>
-            <button class="btn-close-sidebar" onclick="closeSidebar()">&times;</button>
-        </div>
-        <div style="padding: 0 20px;">
-            <button class="btn-clear" onclick="clearAllHistory()">전체 기록 삭제</button>
-        </div>
-        <ul id="history-list" class="history-list">
-            </ul>
+        <div class="sidebar-header"><h3>History List</h3><button class="btn-close-sidebar" onclick="closeSidebar()">&times;</button></div>
+        <div style="padding: 0 20px;"><button class="btn-clear" onclick="clearAllHistory()">전체 기록 삭제</button></div>
+        <ul id="history-list" class="history-list"></ul>
     </aside>
 
     <main class="main-content" onclick="closeSidebar()">
@@ -192,213 +98,120 @@
             <label><input type="checkbox" id="chk-remove-null"> Null 값 삭제</label>
             <label><input type="checkbox" id="chk-sort-keys" checked> 키 정렬 (필수)</label>
             <label style="color: #d10000;"><input type="checkbox" id="chk-diff-only"> <strong>다른 부분만 보기</strong></label>
-            
             <span style="display:inline-block; width: 20px;"></span>
-            
             <button class="btn btn-secondary" onclick="swapInputs()">↔ 좌우 전환</button>
-            <button class="btn btn-primary" onclick="compareJson()">비교 실행</button>
+            <button class="btn btn-primary" onclick="initCompare()">비교 실행</button>
+            <button class="btn btn-warning" onclick="undoAlignment()" id="btn-undo" style="display:none;">↩ 되돌리기 (Ctrl+Z)</button>
+            <button class="btn btn-outline" onclick="resetAlignment()" id="btn-reset-align" style="display:none;">정렬 초기화</button>
         </div>
 
-        <div class="description-container">
-            <input type="text" id="diff-description" class="desc-input" placeholder="설명... ">
+        <div style="margin-bottom:10px;">
+            <input type="text" id="diff-description" class="desc-input" placeholder="설명... (예: 12/01 운영 배포 전 데이터 비교)">
         </div>
+        
+        <div id="align-msg" class="align-info"></div>
 
         <div class="input-container">
-            <div class="input-box">
-                <h3>Left (Original)</h3>
-                <textarea id="json-input-left" placeholder='{"left": "206"}'></textarea>
-            </div>
-            <div class="input-box">
-                <h3>Right (Changed)</h3>
-                <textarea id="json-input-right" placeholder='{"isModifyMode": true}'></textarea>
-            </div>
+            <div class="input-box"><h3>Left (Original)</h3><textarea id="json-input-left" placeholder='{"left": "206"}'></textarea></div>
+            <div class="input-box"><h3>Right (Changed)</h3><textarea id="json-input-right" placeholder='{"isModifyMode": true}'></textarea></div>
         </div>
-
         <div id="result-container"></div>
     </main>
 
 <script>
-    function toggleSidebar(e) {
-        e.stopPropagation();
-        const sidebar = document.getElementById('history-sidebar');
-        sidebar.classList.toggle('open');
-    }
-
-    function closeSidebar() {
-        const sidebar = document.getElementById('history-sidebar');
-        sidebar.classList.remove('open');
-    }
-
-    const STORAGE_KEY = 'json_diff_history_final'; 
+    // --- 유틸리티 및 히스토리 관리 ---
+    function toggleSidebar(e) { e.stopPropagation(); document.getElementById('history-sidebar').classList.toggle('open'); }
+    function closeSidebar() { document.getElementById('history-sidebar').classList.remove('open'); }
+    const STORAGE_KEY = 'json_diff_history_final_v3'; 
     let historyData = [];
 
-    window.onload = function() {
-        loadHistory();
-    };
+    window.onload = function() { loadHistory(); };
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoAlignment(); }
+    });
 
     function loadHistory() {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                historyData = JSON.parse(stored);
-            } catch(e) { historyData = []; }
-        }
+        if (stored) { try { historyData = JSON.parse(stored); } catch(e) { historyData = []; } }
         renderHistoryList();
-
-        // 자동 복구 로직 (가장 최근 것)
         if (historyData.length > 0) {
             const lastItem = historyData[0];
             document.getElementById('json-input-left').value = lastItem.left;
             document.getElementById('json-input-right').value = lastItem.right;
             document.getElementById('diff-description').value = lastItem.description || "";
-            compareJson(true);
+            initCompare(true);
         }
     }
-
-    function getJsonSnippet(jsonStr) {
-        if (!jsonStr) return "Empty";
-        try {
-            const minified = jsonStr.replace(/\s/g, "");
-            const limit = 40;
-            if (minified.length > limit) return minified.substring(0, limit) + "...";
-            return minified;
-        } catch (e) { return "Data..."; }
-    }
-
     function saveToHistory(left, right) {
         if (!left.trim() && !right.trim()) return;
         const descInput = document.getElementById('diff-description').value.trim();
-
         if (historyData.length > 0) {
             const last = historyData[0];
             if (last.left === left && last.right === right && last.description === descInput) return;
         }
-
-        let displayTitle = "";
-        if (descInput) {
-            displayTitle = descInput;
-        } else {
-            const lSum = getJsonSnippet(left);
-            const rSum = getJsonSnippet(right);
-            displayTitle = `<span style="font-family:monospace; color:#555;">${lSum}</span><br>⬇<br><span style="font-family:monospace; color:#0069d9;">${rSum}</span>`;
-        }
-
-        const newItem = {
-            id: Date.now(),
-            date: new Date().toLocaleString(),
-            title: displayTitle,
-            description: descInput,
-            left: left,
-            right: right
-        };
-
-        historyData.unshift(newItem);
+        const displayTitle = descInput || "JSON Diff";
+        historyData.unshift({ id: Date.now(), date: new Date().toLocaleString(), title: displayTitle, description: descInput, left, right });
         if (historyData.length > 50) historyData.pop();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(historyData));
         renderHistoryList();
     }
-
-    // [핵심] 리스트 렌더링 수정 (Overlay + X 버튼 추가)
     function renderHistoryList() {
         const listEl = document.getElementById('history-list');
         listEl.innerHTML = '';
-
         historyData.forEach((item, index) => {
             const li = document.createElement('li');
             li.className = 'history-item';
-            // 기본 클릭: 복원
             li.onclick = () => { restoreHistory(index); closeSidebar(); };
-            
-            li.innerHTML = `
-                <div class="history-date">${item.date}</div>
-                <div class="history-title">${item.title}</div>
-                
-                <div class="delete-overlay">
-                    <button class="btn-delete-circle" onclick="deleteHistoryItem(${index}, event)">
-                        &times;
-                    </button>
-                </div>
-            `;
+            li.innerHTML = `<div class="history-date">${item.date}</div><div class="history-title">${item.title}</div><div class="delete-overlay"><button class="btn-delete-circle" onclick="deleteHistoryItem(${index}, event)">&times;</button></div>`;
             listEl.appendChild(li);
         });
     }
-
     function restoreHistory(index) {
         const item = historyData[index];
         if (!item) return;
-
-        const items = document.querySelectorAll('.history-item');
-        items.forEach(el => el.classList.remove('active'));
-        items[index].classList.add('active');
-
         document.getElementById('json-input-left').value = item.left;
         document.getElementById('json-input-right').value = item.right;
         document.getElementById('diff-description').value = item.description || "";
-
-        compareJson(true);
+        initCompare(true);
     }
-
-    // [추가] 개별 아이템 삭제 함수
     function deleteHistoryItem(index, event) {
-        event.stopPropagation(); // 부모(li)의 onclick 이벤트(복원) 방지
-        
-		historyData.splice(index, 1); // 배열에서 제거
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(historyData)); // 저장소 업데이트
-		renderHistoryList(); // 목록 다시 그리기
+        event.stopPropagation();
+        historyData.splice(index, 1);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(historyData));
+        renderHistoryList();
     }
-
     function clearAllHistory() {
-        if (confirm('모든 히스토리를 삭제하시겠습니까?')) {
-            historyData = [];
-            localStorage.removeItem(STORAGE_KEY);
-            renderHistoryList();
-        }
+        if (confirm('모든 히스토리를 삭제하시겠습니까?')) { historyData = []; localStorage.removeItem(STORAGE_KEY); renderHistoryList(); }
     }
-
-    // --- Diff Logic (유지) ---
     function swapInputs() {
         const leftEl = document.getElementById('json-input-left');
         const rightEl = document.getElementById('json-input-right');
-        const temp = leftEl.value;
-        leftEl.value = rightEl.value;
-        rightEl.value = temp;
-        if (leftEl.value.trim() !== "" || rightEl.value.trim() !== "") compareJson();
+        const temp = leftEl.value; leftEl.value = rightEl.value; rightEl.value = temp;
+        if (leftEl.value.trim() !== "") initCompare();
     }
-
     function removeNulls(obj) {
         if (Array.isArray(obj)) return obj.map(v => removeNulls(v)).filter(v => v !== null);
-        if (typeof obj === 'object' && obj !== null) {
-            return Object.keys(obj).reduce((acc, key) => {
-                const val = removeNulls(obj[key]);
-                if (val !== null) acc[key] = val;
-                return acc;
-            }, {});
-        }
+        if (typeof obj === 'object' && obj !== null) return Object.keys(obj).reduce((acc, key) => { const val = removeNulls(obj[key]); if (val !== null) acc[key] = val; return acc; }, {});
         return obj;
     }
-
     function sortObject(obj) {
         if (Array.isArray(obj)) return obj.map(sortObject);
-        if (typeof obj === 'object' && obj !== null) {
-            return Object.keys(obj).sort().reduce((acc, key) => {
-                acc[key] = sortObject(obj[key]);
-                return acc;
-            }, {});
-        }
+        if (typeof obj === 'object' && obj !== null) return Object.keys(obj).sort().reduce((acc, key) => { acc[key] = sortObject(obj[key]); return acc; }, {});
         return obj;
     }
+    function getIndentLevel(str) { return (str.match(/^(\s*)/) || [""])[0].length; }
+    function extractKey(str) { const match = str.match(/^\s*"([^"]+)"\s*:/); return match ? match[1] : null; }
 
-    function getIndentLevel(str) {
-        const match = str.match(/^(\s*)/);
-        return match ? match[0].length : 0;
-    }
+    // --- 핵심 로직 (Undo Stack + Un-align) ---
 
-    function extractKey(str) {
-        const match = str.match(/^\s*"([^"]+)"\s*:/);
-        return match ? match[1] : null;
-    }
+    let gLeftLines = [];  
+    let gRightLines = []; 
+    let gSelection = { left: null, right: null }; 
+    let gAlignments = []; 
+    let gUndoStack = []; // Undo를 위한 상태 스택
 
-    function compareJson(isRestoreFromHistory = false) {
+    function initCompare(isRestoreFromHistory = false) {
+        resetSelectionState(true);
         const leftRaw = document.getElementById('json-input-left').value;
         const rightRaw = document.getElementById('json-input-right').value;
         
@@ -409,7 +222,6 @@
 
         const removeNullOption = document.getElementById('chk-remove-null').checked;
         const sortKeyOption = document.getElementById('chk-sort-keys').checked;
-        const diffOnlyOption = document.getElementById('chk-diff-only').checked;
         const resultContainer = document.getElementById('result-container');
 
         let leftObj, rightObj;
@@ -425,64 +237,175 @@
         if (removeNullOption) { leftObj = removeNulls(leftObj); rightObj = removeNulls(rightObj); }
         if (sortKeyOption) { leftObj = sortObject(leftObj); rightObj = sortObject(rightObj); }
 
-        const leftStr = JSON.stringify(leftObj, null, 4);
-        const rightStr = JSON.stringify(rightObj, null, 4);
-        const diff = Diff.diffLines(leftStr, rightStr);
-        
-        let allRows = [], leftBuffer = [], rightBuffer = [];
+        gLeftLines = JSON.stringify(leftObj, null, 4).split('\n');
+        gRightLines = JSON.stringify(rightObj, null, 4).split('\n');
 
-        function flushToRows() {
-            let lIndex = 0, rIndex = 0;
-            while (lIndex < leftBuffer.length || rIndex < rightBuffer.length) {
-                const lItem = leftBuffer[lIndex], rItem = rightBuffer[rIndex];
+        performDiffAndRender();
+    }
+
+    function resetSelectionState(fullReset = false) {
+        gSelection = { left: null, right: null };
+        if (fullReset) {
+            gAlignments = [];
+            gUndoStack = [];
+        }
+        updateControlButtons();
+    }
+
+    function resetAlignment() { initCompare(true); }
+
+    // [중요] 상태 저장: 현재 gAlignments의 복사본을 스택에 저장
+    function saveStateToUndoStack() {
+        // 배열 안의 객체도 복사하기 위해 Deep Copy 혹은 map으로 새 객체 생성
+        const currentSnapshot = gAlignments.map(a => ({...a}));
+        gUndoStack.push(currentSnapshot);
+    }
+
+    function undoAlignment() {
+        if (gUndoStack.length === 0) return;
+        const prevState = gUndoStack.pop();
+        gAlignments = prevState;
+        gSelection = { left: null, right: null }; // 선택 상태 초기화
+        performDiffAndRender();
+    }
+
+    function updateControlButtons() {
+        const hasHistory = gUndoStack.length > 0;
+        const hasAlignments = gAlignments.length > 0;
+        
+        document.getElementById('btn-reset-align').style.display = hasAlignments ? 'inline-block' : 'none';
+        document.getElementById('btn-undo').style.display = hasHistory ? 'inline-block' : 'none';
+        
+        const msg = document.getElementById('align-msg');
+        if (hasAlignments) {
+            msg.innerHTML = `현재 <strong>${gAlignments.length}</strong>개의 줄이 정렬됨. <span style="color:#2e7d32">초록색 줄</span>을 클릭하면 정렬이 해제됩니다. <span class="shortcut-tip">(Ctrl+Z 실행취소)</span>`;
+        } else {
+            msg.innerHTML = `왼쪽과 오른쪽에서 맞추고 싶은 줄을 각각 클릭하세요. <span class="shortcut-tip">※ Ctrl + Z 로 되돌리기 가능</span>`;
+        }
+    }
+
+    function performDiffAndRender() {
+        updateControlButtons();
+        const diffOnlyOption = document.getElementById('chk-diff-only').checked;
+        let allDisplayRows = []; 
+
+        gAlignments.sort((a, b) => a.left - b.left);
+
+        let prevL = 0;
+        let prevR = 0;
+
+        gAlignments.forEach(align => {
+            const currentL = align.left;
+            const currentR = align.right;
+
+            // Chunk Diff
+            if (currentL > prevL || currentR > prevR) {
+                const chunkL = gLeftLines.slice(prevL, currentL).join('\n');
+                const chunkR = gRightLines.slice(prevR, currentR).join('\n');
+                const diffChunk = Diff.diffLines(chunkL, chunkR);
+                allDisplayRows = allDisplayRows.concat(generateRowsFromDiff(diffChunk, prevL, prevR));
+            }
+
+            // Forced Row
+            const alignedRow = {
+                left: { text: gLeftLines[currentL], type: 'bg-white', lineIndex: currentL },
+                right: { text: gRightLines[currentR], type: 'bg-white', lineIndex: currentR },
+                indent: getIndentLevel(gLeftLines[currentL]),
+                isDiff: gLeftLines[currentL] !== gRightLines[currentR],
+                textForContext: gLeftLines[currentL],
+                isForced: true 
+            };
+            if (alignedRow.isDiff) {
+                alignedRow.left.type = 'bg-diff';
+                alignedRow.right.type = 'bg-diff';
+            }
+            allDisplayRows.push(alignedRow);
+
+            prevL = currentL + 1;
+            prevR = currentR + 1;
+        });
+
+        // Tail Diff
+        if (prevL < gLeftLines.length || prevR < gRightLines.length) {
+            const tailL = gLeftLines.slice(prevL).join('\n');
+            const tailR = gRightLines.slice(prevR).join('\n');
+            const diffTail = Diff.diffLines(tailL, tailR);
+            allDisplayRows = allDisplayRows.concat(generateRowsFromDiff(diffTail, prevL, prevR));
+        }
+
+        renderRowsToDOM(allDisplayRows, diffOnlyOption);
+    }
+
+    function generateRowsFromDiff(diffData, startLeftLineIdx, startRightLineIdx) {
+        let rows = [];
+        let leftBuffer = [], rightBuffer = [];
+        let curL = startLeftLineIdx;
+        let curR = startRightLineIdx;
+
+        function flush() {
+            let lI = 0, rI = 0;
+            while (lI < leftBuffer.length || rI < rightBuffer.length) {
+                const lItem = leftBuffer[lI];
+                const rItem = rightBuffer[rI];
                 const lKey = lItem ? extractKey(lItem.text) : null;
                 const rKey = rItem ? extractKey(rItem.text) : null;
+                
                 let pushLeft = false, pushRight = false;
-
                 if (lItem && rItem) {
                     if (lKey && rKey) {
-                        if (lKey === rKey) { pushLeft = true; pushRight = true; } 
-                        else if (lKey < rKey) { pushLeft = true; } 
+                        if (lKey === rKey) { pushLeft = true; pushRight = true; }
+                        else if (lKey < rKey) { pushLeft = true; }
                         else { pushRight = true; }
                     } else { pushLeft = true; pushRight = true; }
-                } else if (lItem) { pushLeft = true; } 
+                } else if (lItem) { pushLeft = true; }
                 else if (rItem) { pushRight = true; }
 
-                const lData = pushLeft ? lItem : { text: "", type: "bg-empty" };
-                const rData = pushRight ? rItem : { text: "", type: "bg-empty" };
-                const mainText = (lData.type !== "bg-empty") ? lData.text : rData.text;
-                allRows.push({
-                    left: lData, right: rData, indent: getIndentLevel(mainText),
+                const lData = pushLeft ? lItem : { text: "", type: "bg-empty", lineIndex: -1 };
+                const rData = pushRight ? rItem : { text: "", type: "bg-empty", lineIndex: -1 };
+                
+                rows.push({
+                    left: lData, right: rData,
+                    indent: getIndentLevel(lData.text || rData.text),
                     isDiff: (lData.type === 'bg-diff' || rData.type === 'bg-diff'),
-                    textForContext: mainText
+                    textForContext: lData.text || rData.text
                 });
 
-                if (pushLeft) lIndex++;
-                if (pushRight) rIndex++;
+                if (pushLeft) lI++;
+                if (pushRight) rI++;
             }
             leftBuffer = []; rightBuffer = [];
         }
 
-        diff.forEach((part) => {
-            const lines = part.value.split('\n');
-            if (lines[lines.length - 1] === '') lines.pop();
-            if (part.added) lines.forEach(l => rightBuffer.push({ text: l, type: 'bg-diff' }));
-            else if (part.removed) lines.forEach(l => leftBuffer.push({ text: l, type: 'bg-diff' }));
-            else {
-                flushToRows();
+        diffData.forEach(part => {
+            let lines = part.value.split('\n');
+            if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+            if (part.added) {
+                lines.forEach(l => rightBuffer.push({ text: l, type: 'bg-diff', lineIndex: curR++ }));
+            } else if (part.removed) {
+                lines.forEach(l => leftBuffer.push({ text: l, type: 'bg-diff', lineIndex: curL++ }));
+            } else {
+                flush(); 
                 lines.forEach(l => {
-                    allRows.push({
-                        left: { text: l, type: 'bg-white' }, right: { text: l, type: 'bg-white' },
+                    rows.push({
+                        left: { text: l, type: 'bg-white', lineIndex: curL++ },
+                        right: { text: l, type: 'bg-white', lineIndex: curR++ },
                         indent: getIndentLevel(l), isDiff: false, textForContext: l
                     });
                 });
             }
         });
-        flushToRows();
+        flush();
+        return rows;
+    }
 
+    function renderRowsToDOM(allRows, diffOnlyOption) {
+        const resultContainer = document.getElementById('result-container');
         let visibleIndices = new Set();
-        if (!diffOnlyOption) allRows.forEach((_, idx) => visibleIndices.add(idx));
-        else {
+
+        if (!diffOnlyOption) {
+            allRows.forEach((_, idx) => visibleIndices.add(idx));
+        } else {
             allRows.forEach((row, idx) => { if (row.isDiff) visibleIndices.add(idx); });
             let sortedIndices = [...visibleIndices].sort((a, b) => a - b);
             sortedIndices.forEach(index => {
@@ -521,17 +444,70 @@
             const rowData = allRows[index];
             const rowEl = document.createElement('div');
             rowEl.className = 'diff-row';
-            const leftCell = document.createElement('div');
-            leftCell.className = `cell cell-left ${rowData.left.type}`;
-            leftCell.textContent = rowData.left.text;
-            const rightCell = document.createElement('div');
-            rightCell.className = `cell cell-right ${rowData.right.type}`;
-            rightCell.textContent = rowData.right.text;
-            rowEl.appendChild(leftCell); rowEl.appendChild(rightCell);
+            if (rowData.isForced) rowEl.classList.add('forced-aligned');
+
+            const leftCell = createCell(rowData.left, 'left');
+            const rightCell = createCell(rowData.right, 'right');
+            
+            rowEl.appendChild(leftCell); 
+            rowEl.appendChild(rightCell);
             resultContainer.appendChild(rowEl);
         });
+    }
+
+    function createCell(data, side) {
+        const div = document.createElement('div');
+        div.className = `cell cell-${side} ${data.type}`;
+        div.textContent = data.text;
+        
+        if (data.lineIndex !== -1) {
+            div.onclick = function() { handleCellClick(side, data.lineIndex, div); };
+            if (side === 'left' && gSelection.left === data.lineIndex) div.classList.add('selected');
+            if (side === 'right' && gSelection.right === data.lineIndex) div.classList.add('selected');
+        } else {
+            div.style.cursor = 'default';
+        }
+        return div;
+    }
+
+    function handleCellClick(side, lineIndex, el) {
+        // [기능 추가] 이미 정렬된 줄(녹색)을 클릭했는지 확인 -> 해제 로직
+        const existingAlignIndex = gAlignments.findIndex(align => 
+            (side === 'left' && align.left === lineIndex) || 
+            (side === 'right' && align.right === lineIndex)
+        );
+
+        if (existingAlignIndex !== -1) {
+            // 정렬 해제 로직
+            saveStateToUndoStack(); // 해제 전 상태 저장 (Undo 가능하도록)
+            gAlignments.splice(existingAlignIndex, 1); // 배열에서 제거
+            gSelection = { left: null, right: null }; // 혹시 모를 선택 상태 초기화
+            performDiffAndRender();
+            return;
+        }
+
+        // --- 이하 기존 선택 로직 ---
+        if (gSelection[side] === lineIndex) {
+            gSelection[side] = null;
+            el.classList.remove('selected');
+            return;
+        }
+        
+        const oldSelected = document.querySelectorAll(`.cell-${side}.selected`);
+        oldSelected.forEach(cell => cell.classList.remove('selected'));
+
+        gSelection[side] = lineIndex;
+        el.classList.add('selected');
+
+        if (gSelection.left !== null && gSelection.right !== null) {
+            setTimeout(() => {
+                saveStateToUndoStack(); // 정렬 추가 전 상태 저장
+                gAlignments.push({ left: gSelection.left, right: gSelection.right });
+                gSelection = { left: null, right: null };
+                performDiffAndRender();
+            }, 50);
+        }
     }
 </script>
 </body>
 </html>
-
